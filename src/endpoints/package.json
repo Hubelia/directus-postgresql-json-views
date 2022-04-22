@@ -1,0 +1,17 @@
+{
+  "name": "directus-postgresql-json-views-endpoint",
+  "version": "1.0.0",
+  "directus:extension": {
+    "hidden": true,
+    "host": "^v9.0.0",
+    "path": "dist/index.js",
+    "source": "index.ts",
+    "type": "endpoint"
+  },
+  "files": [
+
+  ],
+  "scripts": {
+    "build": "directus-extension build"
+  }
+}
