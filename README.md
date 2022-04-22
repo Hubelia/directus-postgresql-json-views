@@ -18,6 +18,7 @@ This is still a work in progress.  We tested it with pretty complex database str
 - [ ] Code Cleanup - refactoring, cleanup, etc.
 - [ ] Add tests
 - [ ] Add documentation
+- [ ] Delete a view
 - [ ] Implement the front end in directus so we can add views directly fron the ui
 - [ ] ....
 
@@ -27,6 +28,7 @@ This is still a work in progress.  We tested it with pretty complex database str
 ## Usage
 ### Queries are not implemented yet, so find returns all the objects
 Endpoint ROOT: /pg-json-views
+- On a view creation, 2 postgresql functions are created/updated.
 - '/': 'List the available endpoints for this extension. (You are here)',
 - '/create/[collection]': 'Creates or Replaces a view from the given directus table name from directus schema',
 - '/get/[collection]/all':Get all rows from a view limited to 100.  Use find with a bigger limit if you need more.  Use directus table name.',

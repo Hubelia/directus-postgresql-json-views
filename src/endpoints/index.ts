@@ -331,6 +331,29 @@ export default {
 					}, query);
 			};
 			try {
+				await database.raw(`CREATE OR REPLACE FUNCTION DIRECTUS_M2A_GET_ROW_W_NESTED(_COL_NAME ANYELEMENT,_ITEM_ID text, _SUBQUERIES JSON)
+RETURNS
+SETOF JSON AS $$
+BEGIN
+\tIF (_subqueries::JSONB->>_COL_NAME) IS NOT NULL
+\t\tTHEN RETURN QUERY EXECUTE format('SELECT
+\t   row_to_json(t)
+    FROM %s FROM "%s" WHERE "%s".id::text=%L::text) t', _subqueries::JSONB->>_COL_NAME, _COL_NAME, _COL_NAME,_item_id::text);
+\tELSE
+\tRAISE NOTICE 'Value: %', _COL_NAME;
+\tRETURN QUERY SELECT '{}'::JSON;
+\tEND IF;
+END; $$ LANGUAGE 'plpgsql';
+
+
+CREATE OR REPLACE FUNCTION DIRECTUS_M2A_GET_ROW (_COL_NAME ANYELEMENT,_ITEM_ID text)
+RETURNS
+SETOF JSON AS $$
+BEGIN
+    RETURN QUERY EXECUTE format('SELECT
+\t   row_to_json(t)
+    FROM %s t WHERE t.id::text=%s::text ', _col_name, quote_literal(_item_id)  );
+END; $$ LANGUAGE 'plpgsql';`);
 				const sqlQuery =
 					buildSqlQuery(req.params.collection, null, cached[req.params.collection]) +
 					' FROM ' +
@@ -351,7 +374,7 @@ export default {
 							: database(req.params.collection).select(database.raw(`row_to_json(${req.params.collection}) as data`))
 					);
 				});
-				res.status(200).send({ data: 'Success'});
+				res.status(200).send({ data: 'Success' });
 			} catch (e) {
 				console.log(e);
 				return res.status(500).send({ error: e.message });
