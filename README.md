@@ -15,7 +15,7 @@ This is still a work in progress.  We tested it with pretty complex database str
 ## TODOS
 - [ ] Finish the query system
 - [ ] Implement security - this needs to be looked at as the views are created for all children, therefore, when a user is not allowed to see a child, we need to implement a mechanism to prevent the view from being created/requested.
-- [ ] Code Cleanup - refactoring, cleanup, etc.
+- [ ] Code Cleanup - refactoring, cleanup, Types, etc.
 - [ ] Add tests
 - [ ] Add documentation
 - [ ] Delete a view
