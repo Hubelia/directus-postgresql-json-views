@@ -20,7 +20,9 @@ This is still a work in progress.  We tested it with pretty complex database str
 - [ ] Add documentation
 - [ ] Delete a view
 - [ ] Implement the front end in directus so we can add views directly fron the ui
-- [ ] ....
+- [ ] Return the right type on null (array, object, string, etc)
+- [ ] Apply Queries when creating the views to filter children that are fetched
+- [ ] Add options to remove unwanted fields from the view - and default with sensitive values like passwords
 
 
 
