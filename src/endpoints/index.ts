@@ -77,8 +77,8 @@ export default {
 		router.get('/create/:collection', async (req, res) => {
 			//NEED TO ADD AUTH Check if user is authenticated and has access to this collection and child collections
 			const cached: object = {};
-			const excludedCollection: string[] = ['directus_users', 'directus_files'];
-			const maxDepth = 2;
+			const excludedCollection: string[] = ['directus_users', 'directus_groups'];
+			const maxDepth = 4;
 			// This is a recursive function created to make sure I undesrtand the directus schema system
 			// This function can be removed down the line and use the directus schema system directly
 			const deepSchema = (args: {

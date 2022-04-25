@@ -23,6 +23,8 @@ This is still a work in progress.  We tested it with pretty complex database str
 - [ ] Return the right type on null (array, object, string, etc)
 - [ ] Apply Queries when creating the views to filter children that are fetched
 - [ ] Add options to remove unwanted fields from the view - and default with sensitive values like passwords
+- [ ] Add an option to specify the depth of the children to be fetched
+- [ ] Add an option to use materialized views instead of a plain view
 
 
 
