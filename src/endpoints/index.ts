@@ -3,6 +3,7 @@ import { Knex } from 'knex';
 
 import { getRelationType } from '@directus/shared/utils';
 import ViewBuilder = Knex.ViewBuilder;
+import { cloneDeep } from 'lodash';
 
 export default {
 	id: 'pg-json-views',
@@ -41,8 +42,6 @@ export default {
 		};
 		const schemas = await getSchema();
 		router.get('/', async (req, res) => {
-			const request = new RequestDetails(req);
-			if (!request.isAuthenticated()) return sendUnauthedMessage(res);
 			res.send({
 				'/': 'List the available endpoints for this extension. (You are here)',
 				'/create/[collection]': 'Creates or Replaces a view from the given directus table name from directus schema',
@@ -78,9 +77,10 @@ export default {
 			//NEED TO ADD AUTH Check if user is authenticated and has access to this collection and child collections
 			const cached: object = {};
 			const excludedCollection: string[] = ['directus_users', 'directus_groups'];
-			const maxDepth = 4;
-			// This is a recursive function created to make sure I undesrtand the directus schema system
+			const maxDepth = 3;
+			// This is a recursive function created to make sure I understand the directus schema system
 			// This function can be removed down the line and use the directus schema system directly
+			const depthLimitReached = (str: string, alias): boolean => str.split(alias).length >= maxDepth;
 			const deepSchema = (args: {
 				collection: string;
 				parentCollection: string | null;
@@ -88,99 +88,115 @@ export default {
 				path: string;
 				alias: string;
 			}) => {
-				let { path, parent } = args;
-				const { collection, parentCollection, alias } = args;
-				path += collection + '.';
-				const noFetch = alias && path.split(alias).length - 1 >= maxDepth;
-				if ((parentCollection && collection === req.params.collection) || noFetch) {
-					return { field: schemas.collections[collection], relation: null };
-				}
-				if (alias && cached[alias]) {
-					return cached[alias];
-				}
+				const { collection, parentCollection, alias, path, parent } = args;
+				let nestedParent = cloneDeep(parent);
+				const noFetch = (alias && path.split(alias).length - 1 >= maxDepth) || excludedCollection.includes(collection);
+				const nestedPath = path + collection + '.';
 				const collectionSchema = schemas.collections[collection];
+				if ((parentCollection && collection === req.params.collection) || noFetch) {
+					return { ...collectionSchema.fields, relation: null };
+				}
 				if (!collectionSchema) return res.status(404).send({ data: 'Collection not found' });
 				const aliases = Object.keys(collectionSchema.fields)
 					.filter((i) => collectionSchema.fields[i].alias)
 					.map((i) => collection + '_' + i);
 				const relations = schemas.relations.filter(
 					(i) =>
-						(i.collection === collection || aliases.includes(i.collection)) &&
-						i.collection !== req.param.collection &&
-						(!parentCollection || (parentCollection && i.related_collection !== parentCollection))
+						(i.collection === collection || aliases.includes(i.collection)) && i.collection !== req.param.collection
 				);
-				if (Object.keys(parent).length === 0) {
-					parent = { ...collectionSchema.fields };
+				if (Object.keys(nestedParent).length === 0) {
+					nestedParent = { ...collectionSchema.fields };
 				}
-				relations.forEach((relation) => {
-					const field: string =
-						Object.keys(collectionSchema.fields).find(
-							(i) =>
-								i === relation.field ||
-								(collectionSchema.fields[i].alias &&
-									relation.related_collection === collection &&
-									relation.collection.split('_').pop() === i)
-						) || '';
-					if (field) {
+				const getRelationCollectionField = (relation: object) =>
+					Object.keys(collectionSchema.fields).find(
+						(i) =>
+							i === relation.field ||
+							(collectionSchema.fields[i].alias &&
+								relation.related_collection === collection &&
+								relation.collection.split('_').pop() === i)
+					) || '';
+				relations
+					.map((m) => {
+						const fieldName = getRelationCollectionField(m);
 						const relationType = getRelationType({
-							relation,
+							relation: m,
 							collection,
-							field: field,
+							field: getRelationCollectionField(m),
 						});
-						const nestedCollection =
-							relationType === 'o2m'
-								? relation.collection
-								: relationType === 'm2a'
-								? relation.meta.one_allowed_collections.filter(
-										(i) => i !== collection && i !== parentCollection && i !== req.params.collection
-								  )
-								: relation.related_collection;
-						if (nestedCollection && nestedCollection !== collection) {
-							if (Array.isArray(nestedCollection)) {
-								parent[field] = nestedCollection.map((i) => {
-									const collString = '.' + collection + '.' + i;
+						return { ...m, fieldName, relationType };
+					})
+					.filter((r) => {
+						const splitField = r.fieldName.split('_');
+						splitField.pop();
+						const parentCollectionName = splitField.join('_');
+						const isLooping =
+							r.relationType === 'm2o' || r.relationType === 'm2am2o'
+								? parentCollectionName === parentCollection
+								: false;
+						return (
+							r.fieldName &&
+							!isLooping &&
+							!depthLimitReached(path, parentCollection + '.' + collection + '.' + r.fieldName)
+						);
+					})
+					.forEach((relation) => {
+						const field: string = relation.fieldName;
+						if (field) {
+							const relationType = relation.relationType;
+							const nestedCollection =
+								relationType === 'o2m'
+									? relation.collection
+									: relationType === 'm2a'
+									? relation.meta.one_allowed_collections.filter(
+											(i) => i !== req.params.collection && !excludedCollection.includes(i)
+									  )
+									: relation.related_collection;
+							if (nestedCollection) {
+								if (Array.isArray(nestedCollection)) {
+									nestedParent[field] = nestedCollection.map((i) => {
+										const collString = '.' + collection + '.' + i;
+										const deepInfo = {
+											collection: i,
+											path: nestedPath,
+											alias: collString,
+											parent: {},
+											parentCollection: collection,
+										};
+										return {
+											collection: i,
+											relation: {
+												type: relationType === 'm2a' ? 'm2am2o' : relationType,
+												...relation,
+											},
+											nested: deepSchema(deepInfo),
+										};
+									});
+								} else if (nestedCollection) {
+									const collString = '.' + collection + '.' + nestedCollection;
 									const deepInfo = {
-										collection: i,
-										path: path,
-										alias: collString,
-										parent: {},
+										collection: nestedCollection,
 										parentCollection: collection,
+										parent: {},
+										path: nestedPath,
+										alias: collString,
 									};
-									return {
-										collection: i,
+									const nested = { field: nestedParent[field].field, nested: deepSchema(deepInfo) };
+									const rel =
+										nestedParent[field].special && nestedParent[field].special.filter((i) => i === 'm2a').length
+											? 'm2a'
+											: relationType;
+									nestedParent[field] = {
+										field: nested,
 										relation: {
-											type: relationType === 'm2a' ? 'm2o' : relationType,
+											type: rel,
 											...relation,
 										},
-										nested: deepSchema(deepInfo),
 									};
-								});
-							} else if (nestedCollection) {
-								const collString = '.' + collection + '.' + nestedCollection;
-								const deepInfo = {
-									collection: nestedCollection,
-									parentCollection: collection,
-									parent: {},
-									path,
-									alias: collString,
-								};
-								const nested = { ...parent[field], nested: deepSchema(deepInfo) };
-								const rel =
-									parent[field].special && parent[field].special.filter((i) => i === 'm2a').length
-										? 'm2a'
-										: relationType;
-								parent[field] = {
-									field: nested,
-									relation: {
-										type: rel,
-										...relation,
-									},
-								};
+								}
 							}
 						}
-					}
-				});
-				return parent;
+					});
+				return nestedParent;
 			};
 
 			cached[req.params.collection] = deepSchema({
@@ -190,6 +206,7 @@ export default {
 				path: '',
 				alias: req.params.collection,
 			});
+			console.log(cached[req.params.collection]);
 			// Create the view query string
 			const buildSqlQuery = (
 				collection: string,
@@ -209,7 +226,7 @@ export default {
 				const jsonFunc =
 					type === 'root'
 						? null
-						: type === 'm2o'
+						: type === 'm2o' || type === 'm2am2o'
 						? 'row_to_json'
 						: type === 'o2m'
 						? 'json_agg'
@@ -234,6 +251,7 @@ export default {
 								localField = relation.schema.foreign_key_column;
 								break;
 							case 'm2o':
+							case 'm2am2o':
 								if (!relation.schema) {
 									console.error('relation.schema is null', relation);
 								}
@@ -249,13 +267,6 @@ export default {
 							default:
 								return acc;
 						}
-						if (foreingCollection === parent || foreingCollection === 'directus_users') {
-							// Prevent infinite loop
-							if (acc.endsWith(', ')) {
-								acc = acc.slice(0, -2);
-							}
-							return acc;
-						}
 						const alias = `nested_${collection}_${foreingCollection}`;
 						acc = buildSqlQuery(
 							foreingCollection,
@@ -270,13 +281,21 @@ export default {
 							acc += ` FROM ${'"' + foreingCollection + '"'} where ${
 								'"' + foreingCollection + '"' + '.' + '"' + foreingField + '"'
 							} = ${'"' + collection + '"'}.${'"' + localField + '"'}`;
-						} else if (relation.type === 'm2o') {
+						} else if (relation.type === 'm2o' || relation.type === 'm2am2o') {
 							acc += ` FROM ${'"' + foreingCollection + '"'} where ${
 								'"' + collection + '"' + '.' + '"' + foreingField + '"'
 							} = ${'"' + foreingCollection + '"'}.${'"' + localField + '"'}`;
-						} else if (relation.type === 'm2a' && field.field?.nested?.item) {
-							const nestedFields = field.field?.nested?.item?.filter((fi) => !fi.collection.startsWith('directus_'));
-							const searchStr = nestedFields.reduce((a, c) => {
+						} else if (
+							relation.type === 'm2a' &&
+							field.field &&
+							field.field.nested &&
+							field.field.nested.item &&
+							Array.isArray(field.field.nested.item)
+						) {
+							const nestedFields = field.field.nested.item.filter(
+								(fi) => fi.collection && !excludedCollection.includes(fi.collection)
+							);
+							const searchStr = nestedFields.reduce((a, c, idx) => {
 								if (c.nested && Object.keys(c.nested).length) {
 									const al = alias + `_${c.collection}`;
 									a[c.collection] = ` (${buildSqlQuery(
@@ -340,7 +359,6 @@ BEGIN
 \t   row_to_json(t)
     FROM %s FROM "%s" WHERE "%s".id::text=%L::text) t', _subqueries::JSONB->>_COL_NAME, _COL_NAME, _COL_NAME,_item_id::text);
 \tELSE
-\tRAISE NOTICE 'Value: %', _COL_NAME;
 \tRETURN QUERY SELECT '{}'::JSON;
 \tEND IF;
 END; $$ LANGUAGE 'plpgsql';

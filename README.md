@@ -25,6 +25,7 @@ This is still a work in progress.  We tested it with pretty complex database str
 - [ ] Add options to remove unwanted fields from the view - and default with sensitive values like passwords
 - [ ] Add an option to specify the depth of the children to be fetched
 - [ ] Add an option to use materialized views instead of a plain view
+- [ ] Check to see if nested table exists
 
 
 
