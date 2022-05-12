@@ -77,7 +77,7 @@ export default {
 			//NEED TO ADD AUTH Check if user is authenticated and has access to this collection and child collections
 			const cached: object = {};
 			const excludedCollection: string[] = ['directus_users', 'directus_groups'];
-			const maxDepth = 3;
+			const maxDepth = 2;
 			// This is a recursive function created to make sure I understand the directus schema system
 			// This function can be removed down the line and use the directus schema system directly
 			const depthLimitReached = (str: string, alias): boolean => str.split(alias).length >= maxDepth;
@@ -90,52 +90,66 @@ export default {
 			}) => {
 				const { collection, parentCollection, alias, path, parent } = args;
 				let nestedParent = cloneDeep(parent);
+				// The following prevents infinite recursion.
+				// We check how many times the alias appears in the path. If it is more than the maxDepth, we stop.
 				const noFetch = (alias && path.split(alias).length - 1 >= maxDepth) || excludedCollection.includes(collection);
 				const nestedPath = path + collection + '.';
 				const collectionSchema = schemas.collections[collection];
 				if ((parentCollection && collection === req.params.collection) || noFetch) {
 					return { ...collectionSchema.fields, relation: null };
 				}
-				if (!collectionSchema) return res.status(404).send({ data: 'Collection not found' });
+				// If there is no collection schemas, we return an error and cancel the operation.
+				if (!collectionSchema) return res.status(404).send({ data: `The collection ${collection} Collection not found` });
+				// Some directus relations uses a different mechanism using aliases.  Here we get the aliases that
+				// relates to the collection.
 				const aliases = Object.keys(collectionSchema.fields)
 					.filter((i) => collectionSchema.fields[i].alias)
 					.map((i) => collection + '_' + i);
+				// The first filer is obvious.  If the collection of the relation is the same, than it is a relation for this collection.
+				// the second filter checks if an alias exists for the collection. If it does, than it is a relation for this collection if the related collection.
+				// of the relation is the same as the collection.
 				const relations = schemas.relations.filter(
 					(i) =>
-						(i.collection === collection || aliases.includes(i.collection)) && i.collection !== req.param.collection
+						(i.collection === collection || (aliases.includes(i.collection) && i.related_collection === collection) && i.collection !== req.param.collection
 				);
 				if (Object.keys(nestedParent).length === 0) {
 					nestedParent = { ...collectionSchema.fields };
 				}
+				// Find the fild that relates to the relationship from the schema
 				const getRelationCollectionField = (relation: object) =>
 					Object.keys(collectionSchema.fields).find(
 						(i) =>
+							// If the key is the same as the relation field, it is a relation.
 							i === relation.field ||
+							// M2A - the following checks for aliases
+							// and checks if the relation is related to the right collection in case there are multiple
+							// m2a relationshipts in the same collection
 							(collectionSchema.fields[i].alias &&
 								relation.related_collection === collection &&
-								relation.collection.split('_').pop() === i)
+								relation.collection.split(collection + '_')[1] === i)
 					) || '';
+
 				relations
 					.map((m) => {
 						const fieldName = getRelationCollectionField(m);
 						const relationType = getRelationType({
 							relation: m,
 							collection,
-							field: getRelationCollectionField(m),
+							field: fieldName,
 						});
 						return { ...m, fieldName, relationType };
 					})
 					.filter((r) => {
-						const splitField = r.fieldName.split('_');
-						splitField.pop();
-						const parentCollectionName = splitField.join('_');
+						// The following prevent a relation from looping for m2a as one of the fild of the collection
+						// points back to the parent collection - therefore we end up with a loop in the relation.
+						// This filters the nested m2o relations to only include the ones that are not pointing back to the parent collection
 						const isLooping =
 							r.relationType === 'm2o' || r.relationType === 'm2am2o'
-								? parentCollectionName === parentCollection
+								? r.related_collection === parentCollection
 								: false;
 						return (
 							r.fieldName &&
-							!isLooping &&
+								!isLooping &&
 							!depthLimitReached(path, parentCollection + '.' + collection + '.' + r.fieldName)
 						);
 					})
@@ -150,7 +164,7 @@ export default {
 									? relation.meta.one_allowed_collections.filter(
 											(i) => i !== req.params.collection && !excludedCollection.includes(i)
 									  )
-									: relation.related_collection;
+									: collection === relation.related_collection ? relation.collection : relation.related_collection ;
 							if (nestedCollection) {
 								if (Array.isArray(nestedCollection)) {
 									nestedParent[field] = nestedCollection.map((i) => {
@@ -206,7 +220,6 @@ export default {
 				path: '',
 				alias: req.params.collection,
 			});
-			console.log(cached[req.params.collection]);
 			// Create the view query string
 			const buildSqlQuery = (
 				collection: string,

@@ -4,7 +4,7 @@
 
 Directus is a powerful, open-source, extensible, and easy-to-use web database management system.
 
-It works really well for many use case, but for really complex database structure where you need the get the whole object, It can greatly affect performance.
+It works really well for many use case, but for really complex database structure where you need the get the whole object, It can greatly affect performance or even render the application unresponsive until the complex queries are completed.
 What we are trying to achieve here is to offload the heavy JSON serialization to the database, and to have a view that can be used to retrieve the object.
 This way, directus still is used to retrieve the object, but the workload itself is offloaded to the database.
 
@@ -19,7 +19,7 @@ This is still a work in progress.  We tested it with pretty complex database str
 - [ ] Add tests
 - [ ] Add documentation
 - [ ] Delete a view
-- [ ] Implement the front end in directus so we can add views directly fron the ui
+- [ ] Implement the front end in directus so we can add views directly from the ui
 - [ ] Return the right type on null (array, object, string, etc)
 - [ ] Apply Queries when creating the views to filter children that are fetched
 - [ ] Add options to remove unwanted fields from the view - and default with sensitive values like passwords
