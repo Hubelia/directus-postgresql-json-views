@@ -50,6 +50,7 @@ export default {
 			res.send({
 				'/': 'List the available endpoints for this extension. (You are here)',
 				'/create/[collection]': 'Creates or Replaces a view from the given directus table name from directus schema',
+				'/refresh/[collection]': 'Refresh the Materialized View from the given directus table name from directus schema',
 				'/get/[collection]/all':
 					'Get all rows from a view limited to 100.  Use find with a bigger limit if you need more.  Use directus table name.',
 				'/get/[collection]/find?[field1=value&field2=value][options]':
@@ -69,6 +70,27 @@ export default {
 			}
 			const result = await getRowsFromQuery(collection, {}, { limit: 100 });
 			return res.status(200).send(result);
+		});
+		router.get('/refresh/:collection', async (req, res) => {
+			//NEED TO ADD AUTH Check if user is authenticated and has access to this collection and child collections
+			const { collection } = req.params;
+			if(!checkPermissions(collection)){
+				return res.status(403).send({
+					error: 'Forbidden',
+					message: 'You do not have permission to access this collection'
+				});
+			}
+			try{
+				await database.schema.refreshMaterializedView(collection+'_view');
+				return res.status(200).send({
+					message: 'Materialized View refreshed'
+				});
+			} catch (e) {
+				return res.status(500).send({
+					error: 'Internal Server Error',
+					message: 'Error refreshing materialized view: ' + e.message;
+				});
+			}
 		});
 		router.get('/get/:collection/findOne', async (req, res) => {
 			//NEED TO ADD AUTH Check if user is authenticated and has access to this collection and child collections
