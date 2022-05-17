@@ -476,7 +476,8 @@ END; $$ LANGUAGE 'plpgsql';`);
 					'"';
 				const view = req.params.collection + '_' + 'view';
 				// Delete the view if it exists
-				await database.schema.dropViewIfExists(view);
+				await database.schema.dropViewIfExists(view).catch(e=>console.warn(e))
+				await database.schema.dropMaterializedViewIfExists(view).catch(e=>console.warn(e))
 				// Create the view
 				const callback = (view) =>{
 					console.log(req.query.materialized, view)
