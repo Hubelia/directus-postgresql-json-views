@@ -8,6 +8,8 @@ It works really well for many use case, but for really complex database structur
 What we are trying to achieve here is to offload the heavy JSON serialization to the database, and to have a view that can be used to retrieve the object.
 This way, directus still is used to retrieve the object, but the workload itself is offloaded to the database.
 
+This plugin should not be used to work around bad database design.  Eventually, if the design is bad, even with views, performance will still be poor.
+
 This is still a work in progress.  We tested it with pretty complex database structures, but it is not yet ready for production use.
 
 
@@ -26,6 +28,9 @@ This is still a work in progress.  We tested it with pretty complex database str
 - [ ] Add an option to specify the depth of the children to be fetched
 - [ ] Add an option to use materialized views instead of a plain view
 - [ ] Check to see if nested table exists
+- [ ] Use Native Joins statement (LEFT JOIN, RIGHT JOIN...) instead of SELECT Sub-queries
+- [X] Add Directus order field using ORDER BY
+- [ ] Excluding fields from the view
 
 
 

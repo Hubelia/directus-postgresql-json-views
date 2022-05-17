@@ -5,6 +5,11 @@ import { getRelationType } from '@directus/shared/utils';
 import ViewBuilder = Knex.ViewBuilder;
 import { cloneDeep } from 'lodash';
 
+const checkPermissions = (collection, user)=> {
+  // Temporary fix for the permissions on directus tables
+	return !collection.toLowerCase().includes('directus_');
+};
+
 export default {
 	id: 'pg-json-views',
 	handler: async (router, context) => {
@@ -56,12 +61,24 @@ export default {
 		router.get('/get/:collection/all', async (req, res) => {
 			//NEED TO ADD AUTH Check if user is authenticated and has access to this collection and child collections
 			const { collection } = req.params;
+			if(!checkPermissions(collection)){
+				return res.status(403).send({
+					error: 'Forbidden',
+					message: 'You do not have permission to access this collection'
+				});
+			}
 			const result = await getRowsFromQuery(collection, {}, { limit: 100 });
 			return res.status(200).send(result);
 		});
 		router.get('/get/:collection/findOne', async (req, res) => {
 			//NEED TO ADD AUTH Check if user is authenticated and has access to this collection and child collections
 			const { collection } = req.params;
+			if(!checkPermissions(collection)){
+				return res.status(403).send({
+					error: 'Forbidden',
+					message: 'You do not have permission to access this collection'
+				});
+			}
 			const result = await getRowsFromQuery(collection, {}, { findOne: true });
 			res.status(200).send(result);
 			return;
@@ -69,6 +86,12 @@ export default {
 		router.get('/get/:collection/find', async (req, res) => {
 			//NEED TO ADD AUTH Check if user is authenticated and has access to this collection and child collections
 			const { collection } = req.params;
+			if(!checkPermissions(collection)){
+				return res.status(403).send({
+					error: 'Forbidden',
+					message: 'You do not have permission to access this collection'
+				});
+			}
 			const result = await getRowsFromQuery(collection, {}, {});
 			res.status(200).send(result);
 			return;
@@ -76,8 +99,14 @@ export default {
 		router.get('/create/:collection', async (req, res) => {
 			//NEED TO ADD AUTH Check if user is authenticated and has access to this collection and child collections
 			const cached: object = {};
-			const excludedCollection: string[] = ['directus_users', 'directus_groups'];
-			const maxDepth = 2;
+			const excludedCollection: string[] = ['directus_users', 'directus_groups', 'directus_folders', 'directus_groups'];
+			const maxDepth = 3;
+			if(!checkPermissions(req.params.collection)){
+				return res.status(403).send({
+					error: 'Forbidden',
+					message: 'You do not have permission to access this collection'
+				});
+			}
 			// This is a recursive function created to make sure I understand the directus schema system
 			// This function can be removed down the line and use the directus schema system directly
 			const depthLimitReached = (str: string, alias): boolean => str.split(alias).length >= maxDepth;
@@ -131,7 +160,9 @@ export default {
 
 				relations
 					.map((m) => {
+						// get the field name that relates to the relationship
 						const fieldName = getRelationCollectionField(m);
+						// get the relation type
 						const relationType = getRelationType({
 							relation: m,
 							collection,
@@ -149,7 +180,7 @@ export default {
 								: false;
 						return (
 							r.fieldName &&
-								!isLooping &&
+							!isLooping &&
 							!depthLimitReached(path, parentCollection + '.' + collection + '.' + r.fieldName)
 						);
 					})
@@ -213,6 +244,7 @@ export default {
 				return nestedParent;
 			};
 
+
 			cached[req.params.collection] = deepSchema({
 				collection: req.params.collection,
 				parent: {},
@@ -230,6 +262,48 @@ export default {
 				alias,
 				m2aDepth
 			) => {
+				const stringifyJSON = (data, depth=0) => {
+					if (data === undefined)
+						return undefined
+					else if (data === null)
+						return 'null'
+					else if (data.constructor === String) {
+						function escape (val:string) {
+							return val
+								.replace(/[\\]/g, '\\\\')
+								.replace(/[\/]/g, '\\/')
+								.replace(/[\b]/g, '\\b')
+								.replace(/[\f]/g, '\\f')
+								.replace(/[\n]/g, '\\n')
+								.replace(/[\r]/g, '\\r')
+								.replace(/[\t]/g, '\\t')
+								.replace(/[\"]/g, '\\"')
+								.replace(/\\'/g, "\\'");
+						}
+						return '"'+escape(data)'"'
+
+					}
+					else if (data.constructor === Number)
+						return String(data)
+					else if (data.constructor === Boolean)
+						return data ? 'true' : 'false'
+					else if (data.constructor === Array)
+						return '[ ' + data.reduce((acc, v) => {
+							if (v === undefined)
+								return [...acc, 'null']
+							else
+								return [...acc, stringifyJSON(v, depth+1)]
+						}, []).join(', ') + ' ]'
+					else if (data.constructor === Object)
+						return '{' + Object.keys(data).reduce((acc, k) => {
+							if (data[k] === undefined)
+								return acc
+							else
+								return [...acc,'"'+ k+'"' + ':' + stringifyJSON(data[k], depth+1)]
+						}, []).join(', ') + '"}'
+					else
+						return '{}'
+				}
 				const nestedRelations = Object.keys(schema)
 					.filter(
 						(f: string) =>
@@ -324,25 +398,33 @@ export default {
 								return a;
 							}, {});
 							if (Object.keys(searchStr).length) {
-								const objString = JSON.stringify(searchStr);
-								let quotes = "'";
-								let a = 0;
-								while (a < m2aDepth) {
-									const currentQutesCount = quotes.match(new RegExp("'", 'g')).length;
-									let b = 0;
-									while (b < currentQutesCount) {
-										quotes = "'" + quotes;
-										b++;
+								try {
+									// const objString = stringifyJSON(searchStr)
+									const objString = JSON.stringify(searchStr);
+									let quotes = "'";
+									let a = 0;
+									while (a < m2aDepth) {
+										const currentQutesCount = quotes.match(new RegExp("'", 'g')).length;
+										let b = 0;
+										while (b < currentQutesCount) {
+											quotes = "'" + quotes;
+											b++;
+										}
+										a++;
 									}
-									a++;
+
+									const inlineStr = `${quotes}${objString}${quotes}::JSON `;
+									acc += `, (SELECT * FROM DIRECTUS_M2A_GET_ROW_W_NESTED(${'"' + foreingCollection + '"'}.COLLECTION, ${
+										'"' + foreingCollection + '"'
+									}.ITEM, ${inlineStr}) AS ITEM) FROM "${foreingCollection}" where ${
+										'"' + foreingCollection + '"' + '.' + foreingField
+									} = ${'"' + collection + '"'}.${'"' + localField + '"'}`;
+
+								} catch (e) {
+									// console.error(e, collection, m2aDepth);
+									throw e;
 								}
 
-								const inlineStr = `${quotes}${objString}${quotes}::JSON `;
-								acc += `, (SELECT * FROM DIRECTUS_M2A_GET_ROW_W_NESTED(${'"' + foreingCollection + '"'}.COLLECTION, ${
-									'"' + foreingCollection + '"'
-								}.ITEM, ${inlineStr}) AS ITEM) FROM "${foreingCollection}" where ${
-									'"' + foreingCollection + '"' + '.' + foreingField
-								} = ${'"' + collection + '"'}.${'"' + localField + '"'}`;
 							} else {
 								acc += `, (SELECT * FROM DIRECTUS_M2A_GET_ROW(${
 									'"' + foreingCollection + '"'
@@ -356,9 +438,10 @@ export default {
 							}.${'"' + foreingField + '"'}`;
 						}
 						const getField = (obj: object | string) => (typeof obj === 'string' ? obj : getField(obj.field || ''));
-						acc = parent
-							? acc + `) AS ${alias}) AS ${getField(field)} `
-							: acc + `) AS ${alias}) AS ${getField(field)} `;
+						if(relation.meta && relation.meta.sort_field){
+							acc += ` ORDER BY "${relation.meta.sort_field}"`;
+						}
+						acc += `) AS ${alias}) AS ${getField(field)} `
 						return acc;
 					}, query);
 			};
@@ -396,6 +479,7 @@ END; $$ LANGUAGE 'plpgsql';`);
 				await database.schema.dropViewIfExists(view);
 				// Create the view
 				await database.schema.createView(view, function (view: ViewBuilder) {
+					// console.log(sqlQuery)
 					view.columns(['data']);
 					view.as(
 						sqlQuery && sqlQuery.length
@@ -407,8 +491,10 @@ END; $$ LANGUAGE 'plpgsql';`);
 				});
 				res.status(200).send({ data: 'Success' });
 			} catch (e) {
-				console.log(e);
-				return res.status(500).send({ error: e.message });
+				console.error( e.message.substring(e.message.length > 6000 ? e.message.length - 6000 : 0, e.message.length));
+				console.error( e.message.substring(0, 6000));
+
+				return res.status(500).send({ error: e.message.substring(e.message.length > 50000 ? e.message.length - 50000 : 0, e.message.length) });
 			}
 		});
 	},
