@@ -26,7 +26,7 @@ This is still a work in progress.  We tested it with pretty complex database str
 - [ ] Apply Queries when creating the views to filter children that are fetched
 - [ ] Add options to remove unwanted fields from the view - and default with sensitive values like passwords
 - [ ] Add an option to specify the depth of the children to be fetched
-- [ ] Add an option to use materialized views instead of a plain view
+- [X] Add an option to use materialized views instead of a plain view
 - [ ] Check to see if nested table exists
 - [ ] Use Native Joins statement (LEFT JOIN, RIGHT JOIN...) instead of SELECT Sub-queries
 - [X] Add Directus order field using ORDER BY
@@ -40,12 +40,13 @@ This is still a work in progress.  We tested it with pretty complex database str
 Endpoint ROOT: /pg-json-views
 - On a view creation, 2 postgresql functions are created/updated.
 - '/': 'List the available endpoints for this extension. (You are here)',
-- '/create/[collection]': 'Creates or Replaces a view from the given directus table name from directus schema',
+- '/create/[collection]?query': 'Creates or Replaces a view from the given directus table name from directus schema',
 - '/get/[collection]/all':Get all rows from a view limited to 100.  Use find with a bigger limit if you need more.  Use directus table name.',
 - '/get/[collection]/find?[field1=value&field2=value][options]':'Query specific fields from a view using directus table name.  Dot notation can be used to query nested fields.  Returns an array.',
 - '/get/[collection]/findone?[field1=value&field2=value]':'Query specific fields from a view using directus table name.  Dot notation can be used to query nested fields. Returns a single object',
 
-
+## query options
+- [X] materialized=true/false - use materialized views instead of plain views
 
 ## Contributing
 

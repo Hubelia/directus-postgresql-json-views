@@ -478,22 +478,29 @@ END; $$ LANGUAGE 'plpgsql';`);
 				// Delete the view if it exists
 				await database.schema.dropViewIfExists(view);
 				// Create the view
-				await database.schema.createView(view, function (view: ViewBuilder) {
-					// console.log(sqlQuery)
+				const callback = (view) =>{
+					console.log(req.query.materialized, view)
 					view.columns(['data']);
 					view.as(
 						sqlQuery && sqlQuery.length
 							? database
-									.select(database.raw(`row_to_json(${req.params.collection})`))
-									.from(database.raw(`(${sqlQuery}) as ${req.params.collection};`))
+								.select(database.raw(`row_to_json(${req.params.collection})`))
+								.from(database.raw(`(${sqlQuery}) as ${req.params.collection};`))
 							: database(req.params.collection).select(database.raw(`row_to_json(${req.params.collection}) as data`))
 					);
-				});
+				}
+				if(req.query.materialized === 'true'){
+					await database.schema.createMaterializedView(view, function (view: ViewBuilder) {
+						callback(view)
+					});
+				} else {
+					await database.schema.createView(view, function (view: ViewBuilder) {
+						callback(view)
+					});
+				}
 				res.status(200).send({ data: 'Success' });
 			} catch (e) {
 				console.error( e.message.substring(e.message.length > 6000 ? e.message.length - 6000 : 0, e.message.length));
-				console.error( e.message.substring(0, 6000));
-
 				return res.status(500).send({ error: e.message.substring(e.message.length > 50000 ? e.message.length - 50000 : 0, e.message.length) });
 			}
 		});
