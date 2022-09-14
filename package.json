@@ -39,7 +39,7 @@
 		"*.{md,yaml}": "prettier --write"
 	},
 	"dependencies": {
-		"@directus/shared": "^9.8.0",
+		"@directus/shared": "^9.11.1",
 		"big-json": "^3.1.0",
 		"lodash": "^4.17.21"
 	}

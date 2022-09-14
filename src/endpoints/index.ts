@@ -13,7 +13,7 @@ const checkPermissions = (collection, user)=> {
 export default {
 	id: 'pg-json-views',
 	handler: async (router, context) => {
-		const { getSchema, services, env, database, logger } = context;
+		const { getSchema, services, exceptions, env, database, logger } = context;
 		const getRowsFromQuery = async (collection, q, options) => {
 			const query = Object.keys(q).reduce((queryString: string, field: string, idx) => {
 				const queryStr = ` data->>\'${field}\' = \'${q[field]}\'`;
@@ -61,6 +61,7 @@ export default {
 		});
 		router.get('/get/:collection/all', async (req, res) => {
 			//NEED TO ADD AUTH Check if user is authenticated and has access to this collection and child collections
+
 			const { collection } = req.params;
 			if(!checkPermissions(collection)){
 				return res.status(403).send({
