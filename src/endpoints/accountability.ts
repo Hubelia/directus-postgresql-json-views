@@ -13,8 +13,6 @@ type Permissions = {
     delete: boolean;
 };
 
-
-
 export class AuthenticationService {
     accountability: Accountability | null;
     collection: String | null | undefined;
