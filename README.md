@@ -18,6 +18,8 @@ This is still a work in progress.  We tested it with pretty complex database str
 - [ ] Finish the query system
 - [ ] Implement security - this needs to be looked at as the views are created for all children, therefore, when a user is not allowed to see a child, we need to implement a mechanism to prevent the view from being created/requested.
 - [ ] Code Cleanup - refactoring, cleanup, Types, etc.
+- [ ] Exception handling trough Directus exceptions API
+- [ ] Implement logging
 - [ ] Add tests
 - [ ] Add documentation
 - [ ] Delete a view
@@ -41,6 +43,7 @@ Endpoint ROOT: /pg-json-views
 - On a view creation, 2 postgresql functions are created/updated.
 - '/': 'List the available endpoints for this extension. (You are here)',
 - '/create/[collection]?query': 'Creates or Replaces a view from the given directus table name from directus schema',
+- '/refresh/[collection]': 'Refreshes a materialized view from the given directus table name from directus schema',
 - '/get/[collection]/all':Get all rows from a view limited to 100.  Use find with a bigger limit if you need more.  Use directus table name.',
 - '/get/[collection]/find?[field1=value&field2=value][options]':'Query specific fields from a view using directus table name.  Dot notation can be used to query nested fields.  Returns an array.',
 - '/get/[collection]/findone?[field1=value&field2=value]':'Query specific fields from a view using directus table name.  Dot notation can be used to query nested fields. Returns a single object',

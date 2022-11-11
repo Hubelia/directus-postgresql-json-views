@@ -13,7 +13,7 @@ const checkPermissions = (collection, user)=> {
 export default {
 	id: 'pg-json-views',
 	handler: async (router, context) => {
-		const { getSchema, services, env, database, logger } = context;
+		const { getSchema, services, exceptions, env, database, logger } = context;
 		const getRowsFromQuery = async (collection, q, options) => {
 			const query = Object.keys(q).reduce((queryString: string, field: string, idx) => {
 				const queryStr = ` data->>\'${field}\' = \'${q[field]}\'`;
@@ -61,6 +61,7 @@ export default {
 		});
 		router.get('/get/:collection/all', async (req, res) => {
 			//NEED TO ADD AUTH Check if user is authenticated and has access to this collection and child collections
+
 			const { collection } = req.params;
 			if(!checkPermissions(collection)){
 				return res.status(403).send({
@@ -139,13 +140,16 @@ export default {
 				path: string;
 				alias: string;
 			}) => {
+
 				const { collection, parentCollection, alias, path, parent } = args;
+
 				let nestedParent = cloneDeep(parent);
 				// The following prevents infinite recursion.
 				// We check how many times the alias appears in the path. If it is more than the maxDepth, we stop.
 				const noFetch = (alias && path.split(alias).length - 1 >= maxDepth) || excludedCollection.includes(collection);
 				const nestedPath = path + collection + '.';
 				const collectionSchema = schemas.collections[collection];
+
 				if ((parentCollection && collection === req.params.collection) || noFetch) {
 					return { ...collectionSchema.fields, relation: null };
 				}
@@ -166,12 +170,13 @@ export default {
 				if (Object.keys(nestedParent).length === 0) {
 					nestedParent = { ...collectionSchema.fields };
 				}
+
 				// Find the fild that relates to the relationship from the schema
-				const getRelationCollectionField = (relation: object) =>
-					Object.keys(collectionSchema.fields).find(
+				const getRelationCollectionField = (relation: object) =>{
+					return Object.keys(collectionSchema.fields).find(
 						(i) =>
 							// If the key is the same as the relation field, it is a relation.
-							i === relation.field ||
+							i === relation.field || i === relation.meta?.one_field ||
 							// M2A - the following checks for aliases
 							// and checks if the relation is related to the right collection in case there are multiple
 							// m2a relationshipts in the same collection
@@ -179,12 +184,16 @@ export default {
 								relation.related_collection === collection &&
 								relation.collection.split(collection + '_')[1] === i)
 					) || '';
+				}
+
 
 				relations
 					.map((m) => {
 						// get the field name that relates to the relationship
 						const fieldName = getRelationCollectionField(m);
 						// get the relation type
+
+
 						const relationType = getRelationType({
 							relation: m,
 							collection,
@@ -502,7 +511,6 @@ END; $$ LANGUAGE 'plpgsql';`);
 				await database.schema.dropMaterializedViewIfExists(view).catch(e=>console.warn(e))
 				// Create the view
 				const callback = (view) =>{
-					console.log(req.query.materialized, view)
 					view.columns(['data']);
 					view.as(
 						sqlQuery && sqlQuery.length
