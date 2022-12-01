@@ -13,6 +13,8 @@
     "build": "directus-extension build"
   },
   "dependencies": {
-
+    "@directus/sdk": "^10.3.0",
+    "install": "^0.13.0",
+    "npm": "^9.1.3"
   }
 }

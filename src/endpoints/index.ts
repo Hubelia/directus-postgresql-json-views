@@ -1,13 +1,23 @@
 'use strict';
 import { Knex } from 'knex';
+import { Directus } from '@directus/sdk';
+
 
 import { getRelationType } from '@directus/shared/utils';
 import ViewBuilder = Knex.ViewBuilder;
 import { cloneDeep } from 'lodash';
 
-const checkPermissions = (collection, user)=> {
+const checkPermissions = async (collection, req)=> {
   // Temporary fix for the permissions on directus tables
-	return !collection.toLowerCase().includes('directus_');
+	if(!req.token) return false;
+	const directus = new Directus(req.protocol+'://'+req.headers.host);
+	await directus.auth.static(req.token);
+	const user = await directus.users.me.read();
+	const role = await directus.roles.readOne(user.role)
+	if(role && (role.name === 'Admin' || role.name === 'readall' || role.name === 'Administrator')){
+		return !collection.toLowerCase().includes('directus_')
+	}
+	return false;
 };
 
 export default {
@@ -28,7 +38,13 @@ export default {
 							.select('data')
 							.whereRaw(query)
 					: database(collection + '_view').select('data');
-
+			const knexQueryTypicalView = () => {
+				let res = query && query.length ? database(collection).select('*').whereRaw(query) : database(collection).select('*');
+				return res
+			}
+			if(options.typical_view){
+				return knexQueryTypicalView().then((row) => row);
+			}
 			if (options.findOne) {
 				return knexQuery()
 					.first()
@@ -63,7 +79,8 @@ export default {
 			//NEED TO ADD AUTH Check if user is authenticated and has access to this collection and child collections
 
 			const { collection } = req.params;
-			if(!checkPermissions(collection)){
+			const hasPermission = await checkPermissions(collection, req);
+			if(!hasPermission){
 				return res.status(403).send({
 					error: 'Forbidden',
 					message: 'You do not have permission to access this collection'
@@ -72,10 +89,25 @@ export default {
 			const result = await getRowsFromQuery(collection, {}, { limit: 100 });
 			return res.status(200).send(result);
 		});
+		router.get('get/:collection/typical_view', async (req, res) => {
+			//NEED TO ADD AUTH Check if user is authenticated and has access to this collection and child collections
+			const { collection } = req.params;
+			const hasPermission = await checkPermissions(collection, req);
+			if(!hasPermission){
+				return res.status(403).send({
+					error: 'Forbidden',
+					message: 'You do not have permission to access this collection'
+				});
+			}
+			const result = await getRowsFromQuery(collection, {}, { typical_view: true });
+			res.status(200).send(result);
+			return
+		});
 		router.get('/refresh/:collection', async (req, res) => {
 			//NEED TO ADD AUTH Check if user is authenticated and has access to this collection and child collections
 			const { collection } = req.params;
-			if(!checkPermissions(collection)){
+			const hasPermission = await checkPermissions(collection, req);
+			if(!hasPermission){
 				return res.status(403).send({
 					error: 'Forbidden',
 					message: 'You do not have permission to access this collection'
@@ -96,7 +128,8 @@ export default {
 		router.get('/get/:collection/findOne', async (req, res) => {
 			//NEED TO ADD AUTH Check if user is authenticated and has access to this collection and child collections
 			const { collection } = req.params;
-			if(!checkPermissions(collection)){
+			const hasPermission = await checkPermissions(collection, req);
+			if(!hasPermission){
 				return res.status(403).send({
 					error: 'Forbidden',
 					message: 'You do not have permission to access this collection'
@@ -109,7 +142,8 @@ export default {
 		router.get('/get/:collection/find', async (req, res) => {
 			//NEED TO ADD AUTH Check if user is authenticated and has access to this collection and child collections
 			const { collection } = req.params;
-			if(!checkPermissions(collection)){
+			const hasPermission = await checkPermissions(collection, req);
+			if(!hasPermission){
 				return res.status(403).send({
 					error: 'Forbidden',
 					message: 'You do not have permission to access this collection'
@@ -124,7 +158,9 @@ export default {
 			const cached: object = {};
 			const excludedCollection: string[] = ['directus_users', 'directus_groups', 'directus_folders', 'directus_groups'];
 			const maxDepth = 3;
-			if(!checkPermissions(req.params.collection)){
+			const { collection } = req.params;
+			const hasPermission = await checkPermissions(collection, req);
+			if(!hasPermission){
 				return res.status(403).send({
 					error: 'Forbidden',
 					message: 'You do not have permission to access this collection'
@@ -142,7 +178,6 @@ export default {
 			}) => {
 
 				const { collection, parentCollection, alias, path, parent } = args;
-
 				let nestedParent = cloneDeep(parent);
 				// The following prevents infinite recursion.
 				// We check how many times the alias appears in the path. If it is more than the maxDepth, we stop.
@@ -192,7 +227,6 @@ export default {
 						// get the field name that relates to the relationship
 						const fieldName = getRelationCollectionField(m);
 						// get the relation type
-
 
 						const relationType = getRelationType({
 							relation: m,
@@ -293,6 +327,7 @@ export default {
 				alias,
 				m2aDepth
 			) => {
+
 				const stringifyJSON = (data, depth=0) => {
 					if (data === undefined)
 						return undefined
