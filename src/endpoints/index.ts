@@ -89,7 +89,7 @@ export default {
 			const result = await getRowsFromQuery(collection, {}, { limit: 100 });
 			return res.status(200).send(result);
 		});
-		router.get('get/:collection/typical_view', async (req, res) => {
+		router.get('/get/:collection/typical_view', async (req, res) => {
 			//NEED TO ADD AUTH Check if user is authenticated and has access to this collection and child collections
 			const { collection } = req.params;
 			const hasPermission = await checkPermissions(collection, req);
