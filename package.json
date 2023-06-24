@@ -17,7 +17,7 @@
 		"build": "(mkdir -p ../../extensions/endpoints/directus-postgresql-json-views && cd src/endpoints && yarn build && cp -R dist/* ../../../../extensions/endpoints/directus-postgresql-json-views/)"
 	},
 	"devDependencies": {
-		"@directus/extensions-sdk": "9.8.0",
+		"@directus/extensions-sdk": "9.26.0",
 		"@types/dockerode": "3.3.0",
 		"@types/faker": "5.5.9",
 		"@types/jest": "27.4.1",
