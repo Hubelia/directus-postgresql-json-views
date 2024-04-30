@@ -64,6 +64,10 @@
 		"express": "4.19.2",
 		"follow-redirects": "1.15.6",
 		"eslint": "8.3.0",
-		"trim-newlines":"3.0.1"
+		"trim-newlines":"3.0.1",
+		"axios": "1.6.0",
+		"yargs-parser": "13.1.2",
+		"decode-uri-component": "0.2.1",
+		"postcss": "8.4.31"
 	}
 }
