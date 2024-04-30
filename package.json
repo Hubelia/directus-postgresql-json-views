@@ -52,5 +52,12 @@
 		"postcss": "8.4.31",
 		"trim": "0.0.3",
 		"yargs-parser": "13.1.2"
+	},
+	"overrides": {
+		"@babel/traverse": "7.23.2",
+		"knex": "2.4.0",
+		"express": "4.19.2",
+		"follow-redirects": "1.15.6",
+		"eslint": "8.3.0"
 	}
 }
