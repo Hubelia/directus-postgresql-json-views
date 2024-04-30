@@ -51,13 +51,19 @@
 		"zod": "3.22.3",
 		"postcss": "8.4.31",
 		"trim": "0.0.3",
-		"yargs-parser": "13.1.2"
+		"yargs-parser": "13.1.2",
+		"decode-uri-component": "0.2.1",
+		"terser": "5.14.2",
+		"semver": "6.3.1",
+		"knex": "2.4.0",
+		"word-wrap": "1.2.4"
 	},
 	"overrides": {
 		"@babel/traverse": "7.23.2",
 		"knex": "2.4.0",
 		"express": "4.19.2",
 		"follow-redirects": "1.15.6",
-		"eslint": "8.3.0"
+		"eslint": "8.3.0",
+		"trim-newlines":"3.0.1"
 	}
 }
