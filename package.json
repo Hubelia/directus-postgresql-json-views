@@ -45,7 +45,7 @@
 	},
 	"resolutions": {
 		"express": "4.19.2",
-		"axios": "1.6.0",
+		"axios": "1.7.4",
 		"trim-newlines":"3.0.1",
 		"glob-parent":"5.1.2",
 		"zod": "3.22.3",
